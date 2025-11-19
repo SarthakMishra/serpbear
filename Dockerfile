@@ -7,9 +7,9 @@ WORKDIR /app
 RUN npm install -g pnpm@10.13.1
 
 COPY package.json pnpm-lock.yaml ./
+# Force build from source for sqlite3 to ensure compatibility with Node 22 / Alpine
+ENV npm_config_build_from_source=sqlite3
 RUN pnpm install --frozen-lockfile
-# Rebuild sqlite3 to ensure the native binding is present
-RUN pnpm rebuild sqlite3
 
 FROM node:22.11.0-alpine3.20 AS builder
 WORKDIR /app
@@ -30,6 +30,9 @@ ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 # Ensure local binaries (like concurrently) are on the PATH
 ENV PATH="/app/node_modules/.bin:${PATH}"
+
+# Install libc6-compat for potential runtime compatibility
+RUN apk add --no-cache libc6-compat
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
