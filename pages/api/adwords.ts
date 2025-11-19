@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { OAuth2Client } from 'google-auth-library';
+import { Agent } from 'undici';
 import { readFile, writeFile } from 'fs/promises';
 import Cryptr from 'cryptr';
 import db from '../../database/database';
@@ -39,10 +39,26 @@ const getAdwordsRefreshToken = async (req: NextApiRequest, res: NextApiResponse<
             const cryptr = new Cryptr(process.env.SECRET as string);
             const adwords_client_id = settings.adwords_client_id ? cryptr.decrypt(settings.adwords_client_id) : '';
             const adwords_client_secret = settings.adwords_client_secret ? cryptr.decrypt(settings.adwords_client_secret) : '';
-            const oAuth2Client = new OAuth2Client(adwords_client_id, adwords_client_secret, redirectURL);
-            const r = await oAuth2Client.getToken(code);
-            if (r?.tokens?.refresh_token) {
-               const adwords_refresh_token = cryptr.encrypt(r.tokens.refresh_token);
+            const params = new URLSearchParams({
+               code,
+               client_id: adwords_client_id,
+               client_secret: adwords_client_secret,
+               redirect_uri: redirectURL,
+               grant_type: 'authorization_code',
+            });
+            const resp = await fetch('https://oauth2.googleapis.com/token', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+               body: params,
+               dispatcher: new Agent({ connect: { family: 4 } }),
+            });
+            if (!resp.ok) {
+               throw new Error(await resp.text());
+            }
+            const r = await resp.json();
+            const refreshToken = r?.refresh_token || r?.tokens?.refresh_token;
+            if (refreshToken) {
+               const adwords_refresh_token = cryptr.encrypt(refreshToken);
                await writeFile(`${process.cwd()}/data/settings.json`, JSON.stringify({ ...settings, adwords_refresh_token }), { encoding: 'utf-8' });
                return res.status(200).send('Google Ads Intergrated Successfully! You can close this window.');
             }
