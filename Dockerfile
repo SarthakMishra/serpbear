@@ -3,19 +3,15 @@ FROM node:22.11.0-alpine3.20 AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Setup pnpm
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+# Install pnpm directly via npm to avoid corepack signature verification issues
+RUN npm install -g pnpm@10.13.1
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM node:22.11.0-alpine3.20 AS builder
 WORKDIR /app
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN npm install -g pnpm@10.13.1
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -27,9 +23,7 @@ RUN pnpm run build
 
 FROM node:22.11.0-alpine3.20 AS runner
 WORKDIR /app
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN npm install -g pnpm@10.13.1
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
