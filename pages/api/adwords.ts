@@ -48,8 +48,8 @@ const getAdwordsRefreshToken = async (req: NextApiRequest, res: NextApiResponse<
             }
             return res.status(400).send('Error Getting the Google Ads Refresh Token. Please Try Again!');
          } catch (error:any) {
-            let errorMsg = error?.response?.data?.error;
-            if (errorMsg.includes('redirect_uri_mismatch')) {
+            let errorMsg = error?.response?.data?.error || '';
+            if (errorMsg && errorMsg.includes('redirect_uri_mismatch')) {
                errorMsg += ` Redirected URL: ${redirectURL}`;
             }
             console.log('[Error] Getting Google Ads Refresh Token! Reason: ', errorMsg);
