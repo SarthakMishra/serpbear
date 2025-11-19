@@ -23,6 +23,11 @@ RUN pnpm run build
 
 FROM node:22.11.0-alpine3.20 AS runner
 WORKDIR /app
+
+# Setup pnpm environment variables for global installs
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
 RUN npm install -g pnpm@10.13.1
 
 ENV NODE_ENV production
