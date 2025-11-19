@@ -26,6 +26,8 @@ WORKDIR /app
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
+# Ensure local binaries (like concurrently) are on the PATH
+ENV PATH="/app/node_modules/.bin:${PATH}"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -42,12 +44,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/email ./email
 COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 COPY --from=builder --chown=nextjs:nodejs /app/.sequelizerc ./.sequelizerc
 COPY --from=builder --chown=nextjs:nodejs /app/entrypoint.sh ./entrypoint.sh
-
-# Setup runtime dependencies using npm to prevent pnpm from pruning bundled standalone modules
-RUN rm -f package.json
-RUN npm init -y
-RUN npm install cryptr@6.0.3 dotenv@16.0.3 croner@9.0.0 @googleapis/searchconsole@1.0.5 sequelize-cli@6.6.2 @isaacs/ttlcache@1.4.1
-RUN npm install -g concurrently
 
 USER nextjs
 
