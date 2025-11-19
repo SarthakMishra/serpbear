@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Agent } from 'undici';
+import https from 'https';
 import { readFile, writeFile } from 'fs/promises';
 import Cryptr from 'cryptr';
 import db from '../../database/database';
@@ -46,16 +46,29 @@ const getAdwordsRefreshToken = async (req: NextApiRequest, res: NextApiResponse<
                redirect_uri: redirectURL,
                grant_type: 'authorization_code',
             });
-            const resp = await fetch('https://oauth2.googleapis.com/token', {
-               method: 'POST',
-               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-               body: params,
-               dispatcher: new Agent({ connect: { family: 4 } }),
+            const respBody = await new Promise<string>((resolve, reject) => {
+               const req = https.request('https://oauth2.googleapis.com/token', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  agent: new https.Agent({ family: 4 }),
+               }, (res) => {
+                  let data = '';
+                  res.on('data', (chunk) => {
+                     data += chunk;
+                  });
+                  res.on('end', () => {
+                     if (res.statusCode && res.statusCode >= 400) {
+                        reject(new Error(data));
+                     } else {
+                        resolve(data);
+                     }
+                  });
+               });
+               req.on('error', reject);
+               req.write(params.toString());
+               req.end();
             });
-            if (!resp.ok) {
-               throw new Error(await resp.text());
-            }
-            const r = await resp.json();
+            const r = JSON.parse(respBody);
             const refreshToken = r?.refresh_token || r?.tokens?.refresh_token;
             if (refreshToken) {
                const adwords_refresh_token = cryptr.encrypt(refreshToken);
