@@ -7,9 +7,11 @@ WORKDIR /app
 RUN npm install -g pnpm@10.13.1
 
 COPY package.json pnpm-lock.yaml ./
-# Force build from source for sqlite3 to ensure compatibility with Node 22 / Alpine
-ENV npm_config_build_from_source=sqlite3
 RUN pnpm install --frozen-lockfile
+
+# Re-install sqlite3 with npm to ensure the native binding is built and located correctly
+# This replaces the pnpm symlink with a concrete folder, fixing the "Could not locate bindings" error
+RUN npm uninstall sqlite3 && npm install sqlite3 --build-from-source
 
 FROM node:22.11.0-alpine3.20 AS builder
 WORKDIR /app
