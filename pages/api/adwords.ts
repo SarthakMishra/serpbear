@@ -43,7 +43,7 @@ const getAdwordsRefreshToken = async (req: NextApiRequest, res: NextApiResponse<
             const oAuth2Client = new OAuth2Client(
                adwords_client_id,
                adwords_client_secret,
-               redirectURL
+               redirectURL,
             );
 
             const r = await oAuth2Client.getToken(code);
