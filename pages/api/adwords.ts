@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { request as httpsRequest, Agent as HttpsAgent } from 'https';
+import { OAuth2Client } from 'google-auth-library';
 import { readFile, writeFile } from 'fs/promises';
 import Cryptr from 'cryptr';
 import db from '../../database/database';
@@ -39,46 +39,29 @@ const getAdwordsRefreshToken = async (req: NextApiRequest, res: NextApiResponse<
             const cryptr = new Cryptr(process.env.SECRET as string);
             const adwords_client_id = settings.adwords_client_id ? cryptr.decrypt(settings.adwords_client_id) : '';
             const adwords_client_secret = settings.adwords_client_secret ? cryptr.decrypt(settings.adwords_client_secret) : '';
-            const params = new URLSearchParams({
-               code,
-               client_id: adwords_client_id,
-               client_secret: adwords_client_secret,
-               redirect_uri: redirectURL,
-               grant_type: 'authorization_code',
-            });
-            const respBody = await new Promise<string>((resolve, reject) => {
-               const tokenReq = httpsRequest('https://oauth2.googleapis.com/token', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                  agent: new HttpsAgent({ family: 4 }),
-               }, (tokenRes) => {
-                  let data = '';
-                  tokenRes.on('data', (chunk) => {
-                     data += chunk;
-                  });
-                  tokenRes.on('end', () => {
-                     if (tokenRes.statusCode && tokenRes.statusCode >= 400) {
-                        reject(new Error(data));
-                     } else {
-                        resolve(data);
-                     }
-                  });
-               });
-               tokenReq.on('error', reject);
-               tokenReq.write(params.toString());
-               tokenReq.end();
-            });
-            const r = JSON.parse(respBody);
-            const refreshToken = r?.refresh_token || r?.tokens?.refresh_token;
-            if (refreshToken) {
-               const adwords_refresh_token = cryptr.encrypt(refreshToken);
+
+            const oAuth2Client = new OAuth2Client(
+               adwords_client_id,
+               adwords_client_secret,
+               redirectURL
+            );
+
+            const r = await oAuth2Client.getToken(code);
+
+            if (r?.tokens?.refresh_token) {
+               const adwords_refresh_token = cryptr.encrypt(r.tokens.refresh_token);
                await writeFile(`${process.cwd()}/data/settings.json`, JSON.stringify({ ...settings, adwords_refresh_token }), { encoding: 'utf-8' });
                return res.status(200).send('Google Ads Intergrated Successfully! You can close this window.');
             }
             return res.status(400).send('Error Getting the Google Ads Refresh Token. Please Try Again!');
          } catch (error: any) {
             let errorMsg = error?.response?.data?.error || '';
-            if (errorMsg && errorMsg.includes('redirect_uri_mismatch')) {
+            // Fallback if error message is in a different place (google-auth-library might return GaxiosError)
+            if (!errorMsg && error.message) {
+               errorMsg = error.message;
+            }
+
+            if (errorMsg && typeof errorMsg === 'string' && errorMsg.includes('redirect_uri_mismatch')) {
                errorMsg += ` Redirected URL: ${redirectURL}`;
             }
             console.log('[Error] Getting Google Ads Refresh Token! Reason: ', errorMsg);
