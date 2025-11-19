@@ -53,6 +53,7 @@ const getAdwordsRefreshToken = async (req: NextApiRequest, res: NextApiResponse<
                errorMsg += ` Redirected URL: ${redirectURL}`;
             }
             console.log('[Error] Getting Google Ads Refresh Token! Reason: ', errorMsg);
+            console.log('[Error] Full Error Object:', JSON.stringify(error, null, 2));
             return res.status(400).send(`Error Saving the Google Ads Refresh Token ${errorMsg ? `. Details: ${errorMsg}` : ''}. Please Try Again!`);
          }
       } else {
