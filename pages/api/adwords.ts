@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import https from 'https';
+import { request as httpsRequest, Agent as HttpsAgent } from 'https';
 import { readFile, writeFile } from 'fs/promises';
 import Cryptr from 'cryptr';
 import db from '../../database/database';
@@ -8,7 +8,7 @@ import { getAdwordsCredentials, getAdwordsKeywordIdeas } from '../../utils/adwor
 
 type adwordsValidateResp = {
    valid: boolean
-   error?: string|null,
+   error?: string | null,
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -47,26 +47,26 @@ const getAdwordsRefreshToken = async (req: NextApiRequest, res: NextApiResponse<
                grant_type: 'authorization_code',
             });
             const respBody = await new Promise<string>((resolve, reject) => {
-               const req = https.request('https://oauth2.googleapis.com/token', {
+               const tokenReq = httpsRequest('https://oauth2.googleapis.com/token', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                  agent: new https.Agent({ family: 4 }),
-               }, (res) => {
+                  agent: new HttpsAgent({ family: 4 }),
+               }, (tokenRes) => {
                   let data = '';
-                  res.on('data', (chunk) => {
+                  tokenRes.on('data', (chunk) => {
                      data += chunk;
                   });
-                  res.on('end', () => {
-                     if (res.statusCode && res.statusCode >= 400) {
+                  tokenRes.on('end', () => {
+                     if (tokenRes.statusCode && tokenRes.statusCode >= 400) {
                         reject(new Error(data));
                      } else {
                         resolve(data);
                      }
                   });
                });
-               req.on('error', reject);
-               req.write(params.toString());
-               req.end();
+               tokenReq.on('error', reject);
+               tokenReq.write(params.toString());
+               tokenReq.end();
             });
             const r = JSON.parse(respBody);
             const refreshToken = r?.refresh_token || r?.tokens?.refresh_token;
@@ -76,7 +76,7 @@ const getAdwordsRefreshToken = async (req: NextApiRequest, res: NextApiResponse<
                return res.status(200).send('Google Ads Intergrated Successfully! You can close this window.');
             }
             return res.status(400).send('Error Getting the Google Ads Refresh Token. Please Try Again!');
-         } catch (error:any) {
+         } catch (error: any) {
             let errorMsg = error?.response?.data?.error || '';
             if (errorMsg && errorMsg.includes('redirect_uri_mismatch')) {
                errorMsg += ` Redirected URL: ${redirectURL}`;
@@ -117,7 +117,7 @@ const validateAdwordsIntegration = async (req: NextApiRequest, res: NextApiRespo
          const keywords = await getAdwordsKeywordIdeas(
             adwordsCreds,
             { country: 'US', language: '1000', keywords: ['compress'], seedType: 'custom' },
-             true,
+            true,
          );
          if (keywords && Array.isArray(keywords) && keywords.length > 0) {
             return res.status(200).json({ valid: true });
