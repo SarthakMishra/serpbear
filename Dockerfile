@@ -45,6 +45,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 COPY --from=builder --chown=nextjs:nodejs /app/.sequelizerc ./.sequelizerc
 COPY --from=builder --chown=nextjs:nodejs /app/entrypoint.sh ./entrypoint.sh
 
+# Copy production node_modules and package metadata from deps stage
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./pnpm-lock.yaml
+
 USER nextjs
 
 EXPOSE 3000
